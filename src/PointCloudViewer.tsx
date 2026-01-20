@@ -3,6 +3,7 @@ import * as THREE from "three";
 import { PointCloudRenderer } from "./pointCloud";
 import { StreamingLASLoader as FinalLASLoader } from "./streaming-loader";
 import "./PointCloudViewer.css";
+import { OrbitControls } from "three/examples/jsm/Addons.js";
 
 export const PointCloudViewer: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -17,7 +18,7 @@ export const PointCloudViewer: React.FC = () => {
     if (!canvasRef.current || !containerRef.current) return;
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0a0a0a);
+    scene.background = new THREE.Color(0xffffff);
 
     const camera = new THREE.PerspectiveCamera(
       75,
@@ -51,46 +52,8 @@ export const PointCloudViewer: React.FC = () => {
     camera.updateProjectionMatrix();
     camera.updateMatrixWorld(true);
 
-    let isDragging = false;
-    let lastMouseX = 0;
-    let lastMouseY = 0;
-
-    const onMouseDown = (e: MouseEvent) => {
-      isDragging = true;
-      lastMouseX = e.clientX;
-      lastMouseY = e.clientY;
-    };
-
-    const onMouseMove = (e: MouseEvent) => {
-      if (!isDragging || !camera) return;
-
-      const deltaX = e.clientX - lastMouseX;
-      const deltaY = e.clientY - lastMouseY;
-
-      camera.rotation.y += deltaX * 0.01;
-      camera.rotation.x += deltaY * 0.01;
-
-      lastMouseX = e.clientX;
-      lastMouseY = e.clientY;
-    };
-
-    const onMouseUp = () => {
-      isDragging = false;
-    };
-
-    const onWheel = (e: WheelEvent) => {
-      if (!camera) return;
-      e.preventDefault();
-
-      const zoomSpeed = 0.001;
-      const zoomFactor = 1 + (e.deltaY * zoomSpeed) / 100;
-      camera.position.multiplyScalar(zoomFactor);
-    };
-
-    canvasRef.current.addEventListener("mousedown", onMouseDown);
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
-    canvasRef.current.addEventListener("wheel", onWheel, { passive: false });
+    const orbitControls = new OrbitControls(camera, renderer.domElement);
+    window.controls = orbitControls;
 
     let prevTime = 0;
     const animate = (raft: number) => {
@@ -101,7 +64,6 @@ export const PointCloudViewer: React.FC = () => {
       }
       const time = raft - prevTime;
       prevTime = time;
-      // oc.update(time);
     };
     animate(0);
 
@@ -142,7 +104,11 @@ export const PointCloudViewer: React.FC = () => {
 
           cameraRef.current.position.copy(center);
           cameraRef.current.position.z += maxDim * 1.5;
+          console.log({ positionUpdated: cameraRef.current.position, center });
           cameraRef.current.lookAt(center);
+
+          window.controls.target.copy(center);
+          window.controls.update();
 
           cameraRef.current.userData.initialPosition =
             cameraRef.current.position.clone();

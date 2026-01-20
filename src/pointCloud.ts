@@ -5,7 +5,7 @@ export class PointCloudRenderer {
   private scene: THREE.Scene;
   private chunks: Map<number, THREE.Points> = new Map();
   private boundingBox: THREE.Box3 = new THREE.Box3();
-  private pointSize: number = 5.0;
+  private pointSize: number = 0.5;
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;

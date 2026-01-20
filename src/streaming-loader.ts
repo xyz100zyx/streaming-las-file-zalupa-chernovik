@@ -2,6 +2,7 @@ import type { LASChunk, LASHeader } from "./types";
 
 export class StreamingLASLoader {
   private pointsPerChunk: number = 200_000; // Оптимально для потока
+  private pointCount: number = 0;
 
   async loadLASFile(
     file: File,
@@ -15,6 +16,7 @@ export class StreamingLASLoader {
     const HEADER_BYTESIZE = 375;
     const headerBuffer = await this.readFileSlice(file, 0, HEADER_BYTESIZE);
     const header = this.parseHeader(headerBuffer);
+    console.log({ header });
 
     console.log("header meta:", {
       points: header.numberOfPoints.toLocaleString(),
@@ -33,6 +35,7 @@ export class StreamingLASLoader {
     }
 
     const totalPoints = header.numberOfPoints;
+    this.totalPoints = totalPoints;
     const pointSize = header.pointDataRecordLength;
     const pointDataOffset = header.offsetToPointData;
     const totalChunks = Math.ceil(totalPoints / this.pointsPerChunk);
@@ -257,8 +260,8 @@ export class StreamingLASLoader {
     const dataView = new DataView(buffer);
     const pointSize = header.pointDataRecordLength;
 
-    const positions = new Float32Array(count * 3);
-    const colors = new Uint8Array(count * 3);
+    const positions = new Float32Array((count * 3) / 1);
+    const colors = new Uint8Array((count * 3) / 1);
 
     let minX = Infinity,
       minY = Infinity,
@@ -297,34 +300,38 @@ export class StreamingLASLoader {
           header.scale[2],
           header.offset[2],
         );
+        const intensity = dataView.getUint16(byteOffset + 12, true);
 
         let red = 255,
           green = 255,
           blue = 255;
-        // сдвиг на 8 бит после оффеста но как будто нахуй надо
-        if (hasColor && pointSize >= 28) {
-          red = Math.min(255, dataView.getUint16(byteOffset + 20, true) >> 8);
-          green = Math.min(255, dataView.getUint16(byteOffset + 22, true) >> 8);
-          blue = Math.min(255, dataView.getUint16(byteOffset + 24, true) >> 8);
+
+        // if (hasColor && pointSize >= 14) {
+        if (true) {
+          red = Math.min(255, dataView.getUint16(byteOffset + 30, true) >> 8);
+          green = Math.min(255, dataView.getUint16(byteOffset + 32, true) >> 8);
+          blue = Math.min(255, dataView.getUint16(byteOffset + 34, true) >> 8);
         }
+        // if (this.pointCount % 7 === 0) {
+        if (true) {
+          const idx = pointsRead * 3;
+          positions[idx] = x;
+          positions[idx + 1] = y;
+          positions[idx + 2] = z;
 
-        const idx = pointsRead * 3;
-        positions[idx] = x;
-        positions[idx + 1] = y;
-        positions[idx + 2] = z;
+          colors[idx] = red;
+          colors[idx + 1] = green;
+          colors[idx + 2] = blue;
 
-        colors[idx] = red;
-        colors[idx + 1] = green;
-        colors[idx + 2] = blue;
-
-        // новые границы геометрии
-        minX = Math.min(minX, x);
-        minY = Math.min(minY, y);
-        minZ = Math.min(minZ, z);
-        maxX = Math.max(maxX, x);
-        maxY = Math.max(maxY, y);
-        maxZ = Math.max(maxZ, z);
-
+          // новые границы геометрии
+          minX = Math.min(minX, x);
+          minY = Math.min(minY, y);
+          minZ = Math.min(minZ, z);
+          maxX = Math.max(maxX, x);
+          maxY = Math.max(maxY, y);
+          maxZ = Math.max(maxZ, z);
+        }
+        this.pointCount++;
         pointsRead++;
       } catch (error) {
         console.log("битая точка ошибка=", JSON.stringify(error));
