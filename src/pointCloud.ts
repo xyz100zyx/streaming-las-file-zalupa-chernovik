@@ -27,7 +27,7 @@ export class PointCloudRenderer {
 
       const colors = new Float32Array(chunk.colors.length);
       for (let i = 0; i < chunk.colors.length; i++) {
-        colors[i] = 1;
+        colors[i] = chunk.colors[i] / 255;
       }
       geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
       console.log("color", geometry.getAttribute("color"));
