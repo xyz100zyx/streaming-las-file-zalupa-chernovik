@@ -1,0 +1,110 @@
+import * as THREE from "three";
+import type { LASChunk } from "./types";
+
+export class PointCloudRenderer {
+  private scene: THREE.Scene;
+  private chunks: Map<number, THREE.Points> = new Map();
+  private boundingBox: THREE.Box3 = new THREE.Box3();
+  private pointSize: number = 5.0;
+
+  constructor(scene: THREE.Scene) {
+    this.scene = scene;
+  }
+
+  addChunk(chunk: LASChunk, chunkIndex: number): void {
+    if (chunk.count === 0) {
+      console.log(`чанк ${chunkIndex} без точек`);
+      return;
+    }
+
+    try {
+      const geometry = new THREE.BufferGeometry();
+
+      geometry.setAttribute(
+        "position",
+        new THREE.BufferAttribute(chunk.points, 3),
+      );
+
+      const colors = new Float32Array(chunk.colors.length);
+      for (let i = 0; i < chunk.colors.length; i++) {
+        colors[i] = 1;
+      }
+      geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+      console.log("color", geometry.getAttribute("color"));
+      console.log("position", geometry.getAttribute("position"));
+
+      geometry.computeBoundingBox();
+
+      const material = new THREE.PointsMaterial({
+        size: this.pointSize,
+        vertexColors: true,
+        sizeAttenuation: true,
+        transparent: false,
+        alphaTest: 0.1,
+      });
+
+      const points = new THREE.Points(geometry, material);
+      points.name = `las-chunk-${chunkIndex}`;
+      points.userData.chunkIndex = chunkIndex;
+      points.userData.pointCount = chunk.count;
+
+      this.scene.add(points);
+      this.chunks.set(chunkIndex, points);
+
+      const min = new THREE.Vector3(...chunk.bounds.min);
+      const max = new THREE.Vector3(...chunk.bounds.max);
+      this.boundingBox.expandByPoint(min);
+      this.boundingBox.expandByPoint(max);
+    } catch (error) {
+      console.log(
+        "Не удалось добавиь чанк ",
+        JSON.stringify(error),
+        " ",
+        JSON.stringify(chunk),
+      );
+    }
+  }
+
+  removeChunk(chunkIndex: number): void {
+    const points = this.chunks.get(chunkIndex);
+    if (points) {
+      this.scene.remove(points);
+      if (points.geometry) {
+        points.geometry.dispose();
+      }
+      if (points.material) {
+        if (Array.isArray(points.material)) {
+          points.material.forEach((m) => m.dispose());
+        } else {
+          points.material.dispose();
+        }
+      }
+      this.chunks.delete(chunkIndex);
+      console.log(`Removed chunk ${chunkIndex}`);
+    }
+  }
+
+  getBoundingBox(): THREE.Box3 {
+    return this.boundingBox.clone();
+  }
+
+  getPointSize(): number {
+    return this.pointSize;
+  }
+
+  getTotalPoints(): number {
+    let total = 0;
+    this.chunks.forEach((points) => {
+      total += points.userData.pointCount || 0;
+    });
+    return total;
+  }
+
+  dispose(): void {
+    this.chunks.forEach((_, chunkIndex) => {
+      this.removeChunk(chunkIndex);
+    });
+    this.chunks.clear();
+    this.boundingBox.makeEmpty();
+  }
+}
