@@ -34,16 +34,37 @@ export class PointCloudRenderer {
       console.log("position", geometry.getAttribute("position"));
 
       geometry.computeBoundingBox();
+      geometry.computeBoundingSphere();
 
-      const material = new THREE.PointsMaterial({
-        size: this.pointSize,
-        vertexColors: true,
-        sizeAttenuation: true,
-        transparent: false,
-        alphaTest: 0.1,
+      const pointShaderMaterial = new THREE.ShaderMaterial({
+        vertexShader: `
+        uniform float pointSize;
+        varying float vDistance;
+        
+        void main() {
+            vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+            vDistance = -mvPosition.z;
+            gl_PointSize = pointSize / vDistance;
+
+            gl_Position = projectionMatrix * mvPosition;
+
+        }
+    `,
+        fragmentShader: `
+          varying vec3 vPosition;
+          varying vec3 vMVPosition;
+          varying vec3 vColor;
+
+          void main(){
+            gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+          }
+        `,
+        uniforms: {
+          pointSize: { value: 2.0 },
+        },
       });
 
-      const points = new THREE.Points(geometry, material);
+      const points = new THREE.Points(geometry, pointShaderMaterial);
       points.name = `las-chunk-${chunkIndex}`;
       points.userData.chunkIndex = chunkIndex;
       points.userData.pointCount = chunk.count;

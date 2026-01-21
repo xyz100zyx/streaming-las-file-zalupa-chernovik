@@ -209,9 +209,9 @@ export class StreamingLASLoader {
       ];
 
       max = [
-        dataView.getFloat64(163, true), // X max
-        dataView.getFloat64(179, true), // Y max
-        dataView.getFloat64(195, true), // Z max
+        dataView.getFloat64(179, true), // X max
+        dataView.getFloat64(195, true), // Y max
+        dataView.getFloat64(211, true), // Z max
       ];
     } else {
       numberOfPoints = dataView.getUint32(107, true);
