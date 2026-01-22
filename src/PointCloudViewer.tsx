@@ -103,7 +103,7 @@ export const PointCloudViewer: React.FC = () => {
           const maxDim = Math.max(size.x, size.y, size.z);
 
           cameraRef.current.position.copy(center);
-          cameraRef.current.position.z += maxDim * 1.5;
+          cameraRef.current.position.z += maxDim / 4;
           console.log({ positionUpdated: cameraRef.current.position, center });
           cameraRef.current.lookAt(center);
 

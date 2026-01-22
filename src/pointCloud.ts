@@ -40,13 +40,15 @@ export class PointCloudRenderer {
         vertexShader: `
         uniform float pointSize;
         varying float vDistance;
+        varying float vPs;
         
         void main() {
             vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-            vDistance = -mvPosition.z;
+            vDistance = abs(mvPosition.z);
             gl_PointSize = pointSize / vDistance;
 
             gl_Position = projectionMatrix * mvPosition;
+            vPs = gl_PointSize;
 
         }
     `,
@@ -54,9 +56,16 @@ export class PointCloudRenderer {
           varying vec3 vPosition;
           varying vec3 vMVPosition;
           varying vec3 vColor;
+          varying float vPs;
 
           void main(){
-            gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+
+          if(vPs * 10.0 < 0.04) {
+            discard;
+            gl_FragColor = vec4(0.0, 1.0, 0.0, 1.0);
+          } else {
+              gl_FragColor = vec4(1.0, 0.0, 0.0, vPs);
+            }
           }
         `,
         uniforms: {
