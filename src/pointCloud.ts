@@ -44,11 +44,26 @@ export class PointCloudRenderer {
         
         void main() {
             vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+            
             vDistance = abs(mvPosition.z);
             gl_PointSize = pointSize / vDistance;
 
+          
+
             gl_Position = projectionMatrix * mvPosition;
             vPs = gl_PointSize;
+
+            float linearDepth = (gl_Position.z / gl_Position.w + 1.0) * 0.5;
+
+            const float minDepthBuf = 0.9996999999999;
+
+            if(linearDepth > 0.999755){
+              if (gl_VertexID % int(20.0 * (linearDepth + fract(linearDepth * 10000000.0))) != 0) {
+                gl_Position = vec4(0.0, 0.0, -2.0, 1.0);
+                gl_PointSize = 0.0;
+                return;
+              }
+            }
 
         }
     `,
@@ -60,18 +75,22 @@ export class PointCloudRenderer {
 
           void main(){
         
-          if(vPs * 10.0 < 0.04) {
-            // discard;
-            vec3 gColor = vec3(0.0, 1.0, 0.0);
-            vec3 mixedColor = mix(gColor, vec3(1.0, 0.0, 0.0), vPs * 10.0);
-            gl_FragColor = vec4(vec3(1.0, 0.0, 0.0), vPs);
-            if(vPs * 10.0 < 0.21){
-              discard;
-            }
-          } else {
-              gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
-            }
+          // if(vPs * 10.0 < 0.04) {
+          //   // discard;
+          //   vec3 gColor = vec3(0.0, 1.0, 0.0);
+          //   vec3 mixedColor = mix(gColor, vec3(1.0, 0.0, 0.0), vPs * 10.0);
+          //   gl_FragColor = vec4(vec3(1.0, 0.0, 0.0), vPs);
+          //   if(vPs * 10.0 < 0.21){
+          //     discard;
+          //   }
+          // } else {
+          //     gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+          //   }
+
+            gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
           }
+
+        
         `,
         uniforms: {
           pointSize: { value: 2.0 },
