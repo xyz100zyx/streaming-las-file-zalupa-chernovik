@@ -10,6 +10,82 @@ interface PointCloudViewerProps {
   maxWorkers?: number;
 }
 
+const MAX_POINTS_IN_MESH = 4_000_000;
+const MAX_BUFFER_LENGTH = MAX_POINTS_IN_MESH * 3;
+
+const createMinInstancedMesh = (
+  allPositions: Float32Array,
+  allColors: Uint8Array,
+  offset: number,
+) => {
+  const SLICE_END = Math.min(allPositions.length, offset + MAX_BUFFER_LENGTH);
+
+  const positions = allPositions.slice(offset, SLICE_END);
+  const colors = allColors.slice(offset, SLICE_END);
+
+  const pointCount = positions.length / 3;
+
+  let minX = Infinity,
+    maxX = -Infinity;
+  let minY = Infinity,
+    maxY = -Infinity;
+  let minZ = Infinity,
+    maxZ = -Infinity;
+
+  for (let i = 0; i < positions.length; i += 3) {
+    const x = positions[i];
+    const y = positions[i + 1];
+    const z = positions[i + 2];
+
+    minX = Math.min(minX, x);
+    maxX = Math.max(maxX, x);
+    minY = Math.min(minY, y);
+    maxY = Math.max(maxY, y);
+    minZ = Math.min(minZ, z);
+    maxZ = Math.max(maxZ, z);
+  }
+
+  const centerX = (minX + maxX) / 2;
+  const centerY = (minY + maxY) / 2;
+  const centerZ = (minZ + maxZ) / 2;
+  const center = new THREE.Vector3(centerX, centerY, centerZ);
+
+  const sizeX = maxX - minX;
+  const sizeY = maxY - minY;
+  const sizeZ = maxZ - minZ;
+  const maxDim = Math.max(sizeX, sizeY, sizeZ);
+
+  const geometry = new THREE.PlaneGeometry(1, 1, 1); // простая сфера как точка
+  const material = new THREE.MeshBasicMaterial({
+    color: 0xffff00,
+    alphaTest: 0.5,
+  });
+  const instancedMesh = new THREE.InstancedMesh(geometry, material, pointCount);
+
+  const matrix = new THREE.Matrix4();
+  for (let i = 0; i < pointCount; i++) {
+    const x = positions[i * 3] - centerX;
+    const y = positions[i * 3 + 1] - centerY;
+    const z = positions[i * 3 + 2] - centerZ;
+
+    matrix.makeTranslation(x, y, z);
+    instancedMesh.setMatrixAt(i, matrix);
+    instancedMesh.setColorAt(
+      i,
+      new THREE.Color().setFromVector3(
+        new THREE.Vector3(colors[i * 3], colors[i * 3 + 1], colors[i * 3 + 2]),
+      ),
+    );
+  }
+  instancedMesh.instanceMatrix.needsUpdate = true;
+  console.log({ instancedMesh, center, maxDim });
+  return {
+    mesh: instancedMesh,
+    center,
+    maxDim,
+  };
+};
+
 export function PointCloudViewer({
   file,
   pointSize = 2.0,
@@ -33,10 +109,15 @@ export function PointCloudViewer({
     const height = containerRef.current.clientHeight;
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xffffff);
+    scene.background = new THREE.Color(0xc9c9c9);
     sceneRef.current = scene;
 
-    const camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 100000);
+    const camera = new THREE.PerspectiveCamera(
+      75,
+      width / height,
+      0.1,
+      1_000_000,
+    );
     camera.position.z = 100;
     cameraRef.current = camera;
 
@@ -55,8 +136,6 @@ export function PointCloudViewer({
     controls.dampingFactor = 0.05;
     controlsRef.current = controls;
 
-    window.controls = controls;
-
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     scene.add(ambientLight);
 
@@ -66,26 +145,11 @@ export function PointCloudViewer({
 
     const animate = () => {
       animationFrameRef.current = requestAnimationFrame(animate);
-      controls.update();
       renderer.render(scene, camera);
     };
     animate();
 
-    const handleResize = () => {
-      if (!containerRef.current || !camera || !renderer) return;
-
-      const width = containerRef.current.clientWidth;
-      const height = containerRef.current.clientHeight;
-
-      camera.aspect = width / height;
-      camera.updateProjectionMatrix();
-      renderer.setSize(width, height);
-    };
-
-    window.addEventListener("resize", handleResize);
-
     return () => {
-      window.removeEventListener("resize", handleResize);
       cancelAnimationFrame(animationFrameRef.current);
 
       if (meshRef.current) {
@@ -118,97 +182,42 @@ export function PointCloudViewer({
       sceneRef.current.remove(meshRef.current);
       meshRef.current.dispose();
     }
+    const INSTANCED_MESH_COUNT =
+      Math.floor(pointCount / MAX_POINTS_IN_MESH) || 1;
 
-    const sphereGeometry = new THREE.SphereGeometry(pointSize, 8, 8);
-
-    const material = new THREE.MeshLambertMaterial({
-      vertexColors: true,
-      color: "red",
-    });
-
-    const mesh = new THREE.InstancedMesh(sphereGeometry, material, pointCount);
-    meshRef.current = mesh;
-
-    const matrix = new THREE.Matrix4();
-    const color = new THREE.Color();
-    console.log({ pointCount, positions, colors });
-    for (let i = 0; i < pointCount; i++) {
-      const x = positions[i * 3];
-      const y = positions[i * 3 + 1];
-      const z = positions[i * 3 + 2];
-
-      matrix.makeTranslation(x, y, z);
-      mesh.setMatrixAt(i, matrix);
-
-      // Цвет
-      //   const r = colors[i * 3] / 255;
-      //   const g = colors[i * 3 + 1] / 255;
-      //   const b = colors[i * 3 + 2] / 255;
-
-      const r = 255;
-      const g = 0;
-      const b = 0;
-
-      color.setRGB(r, g, b);
-      mesh.setColorAt(i, color);
+    let maxDim!: number;
+    let center!: THREE.Vector3;
+    let isCameraWasFit = false;
+    for (let i = 0; i < INSTANCED_MESH_COUNT; i++) {
+      const {
+        center: c,
+        maxDim: md,
+        mesh: instancedMesh,
+      } = createMinInstancedMesh(positions, colors, MAX_BUFFER_LENGTH * i);
+      sceneRef.current.add(instancedMesh);
+      maxDim = md;
+      center = c;
     }
 
-    mesh.computeBoundingBox();
-    mesh.computeBoundingSphere();
+    if (!isCameraWasFit) {
+      cameraRef.current!.position.set(0, 0, maxDim * 2);
+      cameraRef.current!.lookAt(0, 0, 0);
+      cameraRef.current!.far = maxDim * 10;
+      cameraRef.current!.updateProjectionMatrix();
 
-    // снижаем детализацию для далеких объектов
-    mesh.frustumCulled = true;
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) {
-      mesh.instanceColor.needsUpdate = true;
+      controlsRef.current!.target.set(0, 0, 0);
+      controlsRef.current!.update();
+      isCameraWasFit = true;
     }
 
-    sceneRef.current.add(mesh);
+    const boxmesh = new THREE.Mesh(
+      new THREE.BoxGeometry(4, 4, 4),
+      new THREE.MeshBasicMaterial({ vertexColors: true }),
+    );
+    boxmesh.position.set(...center.toArray());
+    boxmesh.position.z -= 100;
 
-    if (header && cameraRef.current && controlsRef.current) {
-      const bbox = mesh.boundingBox;
-      const center = bbox!.getCenter(new THREE.Vector3());
-
-      const size = bbox!.getSize(new THREE.Vector3());
-      const maxDim = Math.max(size.x, size.y, size.z);
-
-      cameraRef.current.position.copy(center);
-      cameraRef.current.position.z += maxDim * 1.5;
-      console.log({ positionUpdated: cameraRef.current.position, center });
-      cameraRef.current.lookAt(center);
-
-      window.controls.target.copy(center);
-      window.controls.update();
-
-      console.log({ camPos: cameraRef.current.position, cameraLookat: center });
-
-      cameraRef.current.userData.initialPosition =
-        cameraRef.current.position.clone();
-      cameraRef.current.userData.initialLookAt = center.clone();
-
-      // const [minX, minY, minZ] = header.min;
-      // const [maxX, maxY, maxZ] = header.max;
-
-      // const center = new THREE.Vector3(
-      //   (minX + maxX) / 2,
-      //   (minY + maxY) / 2,
-      //   (minZ + maxZ) / 2,
-      // );
-
-      // const size = new THREE.Vector3(
-      //   maxX - minX,
-      //   maxY - minY,
-      //   maxZ - minZ,
-      // ).length();
-
-      // cameraRef.current.position.copy(center);
-      // cameraRef.current.position.z += size;
-      // cameraRef.current.lookAt(center);
-      // console.log({ camPos: cameraRef.current.position, cameraLookat: center });
-      // controlsRef.current.target.copy(center);
-      // controlsRef.current.update();
-    }
-    console.log();
+    sceneRef.current.add(boxmesh);
 
     if (pointCount > 1000000) {
       console.log(

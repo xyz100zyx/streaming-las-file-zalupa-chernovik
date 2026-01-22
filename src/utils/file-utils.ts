@@ -1,7 +1,7 @@
 export async function readFileInChunks(
   file: File,
   onProgress?: (progress: number) => void,
-  chunkSize = 256 * 1024 * 1024, // 256 МБ на чанк
+  chunkSize = 256 * 1024 * 1024, // 256 МБ
 ): Promise<ArrayBuffer[]> {
   const chunks: ArrayBuffer[] = [];
   const totalSize = file.size;

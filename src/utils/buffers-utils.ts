@@ -1,6 +1,6 @@
 export function splitLargeBuffer(
   buffer: ArrayBuffer,
-  maxChunkSize = 1024 * 1024 * 1024, // до 2гб
+  maxChunkSize = 1024 * 1024 * 1024, // +- 2гб
 ): ArrayBuffer[] {
   const chunks: ArrayBuffer[] = [];
   const totalBytes = buffer.byteLength;
