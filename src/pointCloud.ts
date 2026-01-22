@@ -59,12 +59,17 @@ export class PointCloudRenderer {
           varying float vPs;
 
           void main(){
-
+        
           if(vPs * 10.0 < 0.04) {
-            discard;
-            gl_FragColor = vec4(0.0, 1.0, 0.0, 1.0);
+            // discard;
+            vec3 gColor = vec3(0.0, 1.0, 0.0);
+            vec3 mixedColor = mix(gColor, vec3(1.0, 0.0, 0.0), vPs * 10.0);
+            gl_FragColor = vec4(vec3(1.0, 0.0, 0.0), vPs);
+            if(vPs * 10.0 < 0.21){
+              discard;
+            }
           } else {
-              gl_FragColor = vec4(1.0, 0.0, 0.0, vPs);
+              gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
             }
           }
         `,
