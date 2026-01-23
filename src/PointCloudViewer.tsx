@@ -4,6 +4,7 @@ import { PointCloudRenderer } from "./pointCloud";
 import { StreamingLASLoader as FinalLASLoader } from "./streaming-loader";
 import "./PointCloudViewer.css";
 import { OrbitControls } from "three/examples/jsm/Addons.js";
+import Stats from "stats.js";
 
 export const PointCloudViewer: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -14,6 +15,8 @@ export const PointCloudViewer: React.FC = () => {
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const pointCloudRef = useRef<PointCloudRenderer | null>(null);
 
+  const statsRef = useRef(new Stats());
+  statsRef.current.showPanel(0); // 0: fps, 1: ms, 2: mb, 3+: custom
   const initThree = useCallback(() => {
     if (!canvasRef.current || !containerRef.current) return;
 
@@ -26,6 +29,9 @@ export const PointCloudViewer: React.FC = () => {
       0.1,
       1000000,
     );
+
+    statsRef.current.showPanel(0);
+    document.body.appendChild(statsRef.current.dom);
 
     const renderer = new THREE.WebGLRenderer({
       canvas: canvasRef.current,
@@ -64,6 +70,7 @@ export const PointCloudViewer: React.FC = () => {
       }
       const time = raft - prevTime;
       prevTime = time;
+      statsRef.current.update();
     };
     animate(0);
 

@@ -7,4 +7,8 @@ export default defineConfig({
   worker: {
     format: "es",
   },
+  optimizeDeps: {
+    force: true,
+    include: ["three", "stats.js"],
+  },
 });
