@@ -41,6 +41,11 @@ export class PointCloudRenderer {
         uniform float pointSize;
         varying float vDistance;
         varying float vPs;
+
+        float calcPointSizeByDepth(float originalSize, float depthBuffer){
+          float KOEF_TO_MULTIPLY_BUFFER_DIFFERENCE = 1000.0; // разница буффера от единицы слишком мала поэтому домножаем на 10 в какой-нибудь степени
+          return originalSize + (1.0 - depthBuffer) * KOEF_TO_MULTIPLY_BUFFER_DIFFERENCE;
+        }
         
         void main() {
             vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
@@ -55,15 +60,18 @@ export class PointCloudRenderer {
 
             float linearDepth = (gl_Position.z / gl_Position.w + 1.0) * 0.5;
 
-            const float minDepthBuf = 0.9996999999999;
+            const float MIN_DEPTH_BUFFER_VALUE = 0.999755;
+            const float COEF_TO_MULTIPLY_LINEAR_DEPTH = 10000000.0; // линейный буффер слишком мал поэтому домножаем на 10 в какой-нить большой степени
 
-            if(linearDepth > 0.999755){
-              if (gl_VertexID % int(20.0 * (linearDepth + fract(linearDepth * 10000000.0))) != 0) {
+            if(linearDepth > MIN_DEPTH_BUFFER_VALUE){
+              if (gl_VertexID % int(20.0 * (linearDepth + fract(linearDepth * COEF_TO_MULTIPLY_LINEAR_DEPTH))) != 0) {
                 gl_Position = vec4(0.0, 0.0, -2.0, 1.0);
                 gl_PointSize = 0.0;
                 return;
               }
             }
+
+            gl_PointSize = calcPointSizeByDepth(gl_PointSize, linearDepth);
 
         }
     `,
