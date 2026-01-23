@@ -6,9 +6,14 @@ export class PointCloudRenderer {
   private chunks: Map<number, THREE.Points> = new Map();
   private boundingBox: THREE.Box3 = new THREE.Box3();
   private pointSize: number = 0.5;
+  private totalPointsCount!: number;
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
+  }
+
+  setTotalPointsCount(totalPointsCount: number) {
+    this.totalPointsCount = totalPointsCount;
   }
 
   addChunk(chunk: LASChunk, chunkIndex: number): void {
@@ -35,6 +40,7 @@ export class PointCloudRenderer {
 
       geometry.computeBoundingBox();
       geometry.computeBoundingSphere();
+      console.log("pc", this.totalPointsCount);
 
       const pointShaderMaterial = new THREE.ShaderMaterial({
         vertexShader: `
@@ -43,17 +49,29 @@ export class PointCloudRenderer {
         varying float vPs;
         varying vec3 vColor;
 
+        uniform float totalPointsCount;
+
         attribute vec3 color;
 
+
+        const float MAX_DEPTH_BUFFER_VALUE = 0.999755;
+        const float MIN_DEPTH_BUFFER_VALUE = 0.993200;
+
+        const float COEF_TO_MULTIPLY_LINEAR_DEPTH = 10000000.0; // линейный буффер слишком мал поэтому домножаем на 10 в какой-нить большой степени
+
         float calcPointSizeByDepth(float originalSize, float depthBuffer){
-          float KOEF_TO_MULTIPLY_BUFFER_DIFFERENCE = 1000.0; // разница буффера от единицы слишком мала поэтому домножаем на 10 в какой-нибудь степени
+          if(depthBuffer < MAX_DEPTH_BUFFER_VALUE) {
+
+            float mixCoefficient = (depthBuffer - MIN_DEPTH_BUFFER_VALUE) / (MAX_DEPTH_BUFFER_VALUE - MIN_DEPTH_BUFFER_VALUE);
+
+            return originalSize * mix(1.0, 18.0, 1.0 - mixCoefficient);
+          }
+          float KOEF_TO_MULTIPLY_BUFFER_DIFFERENCE = 300.0; // разница буффера от единицы слишком мала поэтому домножаем на 10 в какой-нибудь степени
           return originalSize + (1.0 - depthBuffer) * KOEF_TO_MULTIPLY_BUFFER_DIFFERENCE;
         }
 
-        const float TOTAL_POINTS_COUNT = 120000000.0;
-        const float MAX_POINTS_BUDGET  =   10000000.0;
 
-        const float OFFSET_COEFFICIENT = TOTAL_POINTS_COUNT / MAX_POINTS_BUDGET;
+        const float MAX_POINTS_BUDGET  =   1200000.0;
         
         void main() {
             vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
@@ -61,26 +79,31 @@ export class PointCloudRenderer {
             vDistance = abs(mvPosition.z);
             gl_PointSize = pointSize / vDistance;
 
+            float TOTAL_POINTS_COUNT = totalPointsCount;
+
+            float OFFSET_COEFFICIENT = TOTAL_POINTS_COUNT / MAX_POINTS_BUDGET;
           
 
             gl_Position = projectionMatrix * mvPosition;
             vPs = gl_PointSize;
+            vColor = vColor;
 
             float linearDepth = (gl_Position.z / gl_Position.w + 1.0) * 0.5;
 
-            const float MIN_DEPTH_BUFFER_VALUE = 0.999755;
-            const float COEF_TO_MULTIPLY_LINEAR_DEPTH = 10000000.0; // линейный буффер слишком мал поэтому домножаем на 10 в какой-нить большой степени
-
-            if(linearDepth > MIN_DEPTH_BUFFER_VALUE){
-              if (gl_VertexID % int((40.0 + OFFSET_COEFFICIENT) * (linearDepth + fract(linearDepth * COEF_TO_MULTIPLY_LINEAR_DEPTH))) != 0) {
+            if(linearDepth > MAX_DEPTH_BUFFER_VALUE && OFFSET_COEFFICIENT > 1.0){
+              if (gl_VertexID % int((40.0 + (OFFSET_COEFFICIENT + pointSize) * pointSize * 15.0) * (linearDepth + fract(linearDepth * COEF_TO_MULTIPLY_LINEAR_DEPTH))) != 0) {
                 gl_Position = vec4(0.0, 0.0, -2.0, 1.0);
                 gl_PointSize = 0.0;
-                return;
               }
             }
 
-            gl_PointSize = calcPointSizeByDepth(gl_PointSize, linearDepth);
-            vColor = color;
+            if(OFFSET_COEFFICIENT > 1.0){
+              gl_PointSize = calcPointSizeByDepth(pointSize, linearDepth);
+              vColor = color;
+            } else {
+              gl_PointSize = pointSize;  
+              vColor = color;
+            }
 
         }
     `,
@@ -91,18 +114,6 @@ export class PointCloudRenderer {
           varying float vPs;
 
           void main(){
-        
-          // if(vPs * 10.0 < 0.04) {
-          //   // discard;
-          //   vec3 gColor = vec3(0.0, 1.0, 0.0);
-          //   vec3 mixedColor = mix(gColor, vec3(1.0, 0.0, 0.0), vPs * 10.0);
-          //   gl_FragColor = vec4(vec3(1.0, 0.0, 0.0), vPs);
-          //   if(vPs * 10.0 < 0.21){
-          //     discard;
-          //   }
-          // } else {
-          //     gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
-          //   }
 
             gl_FragColor = vec4(vColor, 1.0);
           }
@@ -110,7 +121,8 @@ export class PointCloudRenderer {
         
         `,
         uniforms: {
-          pointSize: { value: 2.0 },
+          pointSize: { value: 1.0 },
+          totalPointsCount: { value: this.totalPointsCount },
         },
       });
 

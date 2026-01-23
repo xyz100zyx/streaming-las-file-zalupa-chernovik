@@ -84,6 +84,8 @@ export const PointCloudViewer: React.FC = () => {
 
         const { chunks } = result;
 
+        pointCloudRef.current.setTotalPointsCount(loader.getTotalPointsCount());
+
         for (let i = 0; i < chunks.length; i++) {
           const chunk = chunks[i];
           if (chunk.count > 0) {

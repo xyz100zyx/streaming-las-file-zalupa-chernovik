@@ -4,6 +4,12 @@ export class StreamingLASLoader {
   private pointsPerChunk: number = 200_000; // Оптимально для потока
   private pointCount: number = 0;
 
+  private totalPointsCount!: number
+
+  getTotalPointsCount(){
+    return this.totalPointsCount
+  }
+
   async loadLASFile(
     file: File,
     onProgress?: (progress: number) => void,
@@ -17,6 +23,7 @@ export class StreamingLASLoader {
     const headerBuffer = await this.readFileSlice(file, 0, HEADER_BYTESIZE);
     const header = this.parseHeader(headerBuffer);
     console.log({ header });
+    this.totalPointsCount = header.numberOfPoints
 
     console.log("header meta:", {
       points: header.numberOfPoints.toLocaleString(),
@@ -35,7 +42,7 @@ export class StreamingLASLoader {
     }
 
     const totalPoints = header.numberOfPoints;
-    this.totalPoints = totalPoints;
+    this.totalPointsCount = totalPoints;
     const pointSize = header.pointDataRecordLength;
     const pointDataOffset = header.offsetToPointData;
     const totalChunks = Math.ceil(totalPoints / this.pointsPerChunk);
