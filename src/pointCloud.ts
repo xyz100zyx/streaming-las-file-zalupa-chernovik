@@ -91,19 +91,25 @@ export class PointCloudRenderer {
             float linearDepth = (gl_Position.z / gl_Position.w + 1.0) * 0.5;
 
             if(linearDepth > MAX_DEPTH_BUFFER_VALUE && OFFSET_COEFFICIENT > 1.0){
-              if (gl_VertexID % int((40.0 + (OFFSET_COEFFICIENT + pointSize) * pointSize * 15.0) * (linearDepth + fract(linearDepth * COEF_TO_MULTIPLY_LINEAR_DEPTH))) != 0) {
+              float normalizedDepthBuffer = (linearDepth - MAX_DEPTH_BUFFER_VALUE) / (1.0 - MAX_DEPTH_BUFFER_VALUE);
+              if (gl_VertexID % int(40.0 + normalizedDepthBuffer * pointSize * 2.0 * 40.0) != 0) {
                 gl_Position = vec4(0.0, 0.0, -2.0, 1.0);
                 gl_PointSize = 0.0;
+                vPs = gl_PointSize;
               }
             }
 
             if(OFFSET_COEFFICIENT > 1.0){
               gl_PointSize = calcPointSizeByDepth(pointSize, linearDepth);
               vColor = color;
+              vPs = gl_PointSize;
             } else {
-              gl_PointSize = pointSize;  
+              gl_PointSize = pointSize;
+              vPs = gl_PointSize;
               vColor = color;
             }
+
+            
 
         }
     `,
