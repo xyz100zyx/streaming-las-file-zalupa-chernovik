@@ -49,6 +49,11 @@ export class PointCloudRenderer {
           float KOEF_TO_MULTIPLY_BUFFER_DIFFERENCE = 1000.0; // разница буффера от единицы слишком мала поэтому домножаем на 10 в какой-нибудь степени
           return originalSize + (1.0 - depthBuffer) * KOEF_TO_MULTIPLY_BUFFER_DIFFERENCE;
         }
+
+        const float TOTAL_POINTS_COUNT = 120000000.0;
+        const float MAX_POINTS_BUDGET  =   10000000.0;
+
+        const float OFFSET_COEFFICIENT = TOTAL_POINTS_COUNT / MAX_POINTS_BUDGET;
         
         void main() {
             vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
@@ -67,7 +72,7 @@ export class PointCloudRenderer {
             const float COEF_TO_MULTIPLY_LINEAR_DEPTH = 10000000.0; // линейный буффер слишком мал поэтому домножаем на 10 в какой-нить большой степени
 
             if(linearDepth > MIN_DEPTH_BUFFER_VALUE){
-              if (gl_VertexID % int(20.0 * (linearDepth + fract(linearDepth * COEF_TO_MULTIPLY_LINEAR_DEPTH))) != 0) {
+              if (gl_VertexID % int((40.0 + OFFSET_COEFFICIENT) * (linearDepth + fract(linearDepth * COEF_TO_MULTIPLY_LINEAR_DEPTH))) != 0) {
                 gl_Position = vec4(0.0, 0.0, -2.0, 1.0);
                 gl_PointSize = 0.0;
                 return;
