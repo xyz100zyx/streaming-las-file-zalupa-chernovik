@@ -41,6 +41,9 @@ export class PointCloudRenderer {
         uniform float pointSize;
         varying float vDistance;
         varying float vPs;
+        varying vec3 vColor;
+
+        attribute vec3 color;
 
         float calcPointSizeByDepth(float originalSize, float depthBuffer){
           float KOEF_TO_MULTIPLY_BUFFER_DIFFERENCE = 1000.0; // разница буффера от единицы слишком мала поэтому домножаем на 10 в какой-нибудь степени
@@ -72,6 +75,7 @@ export class PointCloudRenderer {
             }
 
             gl_PointSize = calcPointSizeByDepth(gl_PointSize, linearDepth);
+            vColor = color;
 
         }
     `,
@@ -95,7 +99,7 @@ export class PointCloudRenderer {
           //     gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
           //   }
 
-            gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+            gl_FragColor = vec4(vColor, 1.0);
           }
 
         
