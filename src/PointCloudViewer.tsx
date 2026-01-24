@@ -1,10 +1,11 @@
-import React, { useRef, useEffect, useCallback } from "react";
+import React, { useRef, useEffect, useCallback, useState } from "react";
 import * as THREE from "three";
 import { PointCloudRenderer } from "./pointCloud";
 import { StreamingLASLoader as FinalLASLoader } from "./streaming-loader";
 import "./PointCloudViewer.css";
 import { OrbitControls } from "three/examples/jsm/Addons.js";
 import Stats from "stats.js";
+import { SceneConfigControls } from "./components/SceneConfigControls";
 
 export const PointCloudViewer: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -14,6 +15,8 @@ export const PointCloudViewer: React.FC = () => {
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const pointCloudRef = useRef<PointCloudRenderer | null>(null);
+
+  const [isSceneInit, setSceneInit] = useState<boolean>(false);
 
   const statsRef = useRef(new Stats());
   statsRef.current.showPanel(0); // 0: fps, 1: ms, 2: mb, 3+: custom
@@ -60,6 +63,8 @@ export const PointCloudViewer: React.FC = () => {
 
     const orbitControls = new OrbitControls(camera, renderer.domElement);
     window.controls = orbitControls;
+
+    setSceneInit(true);
 
     let prevTime = 0;
     const animate = (raft: number) => {
@@ -160,21 +165,26 @@ export const PointCloudViewer: React.FC = () => {
   }, []);
 
   return (
-    <div className="point-cloud-viewer">
-      <div className="controls">
-        <div className="control-group">
-          <input
-            type="file"
-            accept=".las"
-            onChange={handleFileUpload}
-            id="las-file-input"
-          />
+    <>
+      <div className="point-cloud-viewer">
+        <div className="controls">
+          <div className="control-group">
+            <input
+              type="file"
+              accept=".las"
+              onChange={handleFileUpload}
+              id="las-file-input"
+            />
+          </div>
+        </div>
+
+        <div ref={containerRef} className="viewer-container">
+          <canvas ref={canvasRef} />
         </div>
       </div>
-
-      <div ref={containerRef} className="viewer-container">
-        <canvas ref={canvasRef} />
-      </div>
-    </div>
+      {isSceneInit && pointCloudRef.current && (
+        <SceneConfigControls pointCloudRenderer={pointCloudRef.current} />
+      )}
+    </>
   );
 };

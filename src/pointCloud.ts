@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import type { LASChunk } from "./types";
+import { defaultLewaParams } from "./hooks/use-uniform-controls";
 
 export class PointCloudRenderer {
   private scene: THREE.Scene;
@@ -50,10 +51,10 @@ export class PointCloudRenderer {
         varying vec3 vColor;
 
         uniform float totalPointsCount;
+        uniform float depthBufferThreshold;
 
         attribute vec3 color;
-
-
+        
         const float MAX_DEPTH_BUFFER_VALUE = 0.999755;
         const float MIN_DEPTH_BUFFER_VALUE = 0.993200;
 
@@ -127,8 +128,14 @@ export class PointCloudRenderer {
         
         `,
         uniforms: {
-          pointSize: { value: 1.0 },
+          pointSize: { value: defaultLewaParams.pointSize },
           totalPointsCount: { value: this.totalPointsCount },
+          depthBufferThreshold: {
+            value: defaultLewaParams.depthBufferThreshold,
+          },
+          thiningFactorK: {
+            value: defaultLewaParams.thiningFactorK,
+          },
         },
       });
 
@@ -195,5 +202,15 @@ export class PointCloudRenderer {
     });
     this.chunks.clear();
     this.boundingBox.makeEmpty();
+  }
+
+  getAllPointClouds() {
+    const clouds: THREE.Points[] = [];
+
+    this.chunks.forEach((i) => {
+      clouds.push(i);
+    });
+
+    return clouds;
   }
 }
