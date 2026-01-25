@@ -52,23 +52,41 @@ export class PointCloudRenderer {
 
         uniform float totalPointsCount;
         uniform float depthBufferThreshold;
+        uniform float thiningFactorK;
 
         attribute vec3 color;
-        
-        const float MAX_DEPTH_BUFFER_VALUE = 0.999755;
-        const float MIN_DEPTH_BUFFER_VALUE = 0.993200;
+
+        const float MIN_DEPTH_BUFFER_VALUE = 0.993200; // чуть за камерой 
 
         const float COEF_TO_MULTIPLY_LINEAR_DEPTH = 10000000.0; // линейный буффер слишком мал поэтому домножаем на 10 в какой-нить большой степени
 
+
+        float getMaxThresholdDepthBuffer(){
+
+          float MIN_MAX_DIFF = 0.006790; // 0.999999 - 0.993200
+
+          float MAX_DEPTH_BUFFER_VALUE = MIN_DEPTH_BUFFER_VALUE + depthBufferThreshold * MIN_MAX_DIFF;
+
+          return MAX_DEPTH_BUFFER_VALUE;
+        }
+
         float calcPointSizeByDepth(float originalSize, float depthBuffer){
-          if(depthBuffer < MAX_DEPTH_BUFFER_VALUE) {
 
-            float mixCoefficient = (depthBuffer - MIN_DEPTH_BUFFER_VALUE) / (MAX_DEPTH_BUFFER_VALUE - MIN_DEPTH_BUFFER_VALUE);
 
-            return originalSize * mix(1.0, 18.0, 1.0 - mixCoefficient);
+          float MAX_SIZE_KOEFFICIENT_FOR_DISTANT_POINTS = 3.0;
+
+          if(depthBuffer < getMaxThresholdDepthBuffer()) {
+
+            float mixCoefficient = (depthBuffer - MIN_DEPTH_BUFFER_VALUE) / (getMaxThresholdDepthBuffer() - MIN_DEPTH_BUFFER_VALUE);
+            float minAvailableSize = originalSize * MAX_SIZE_KOEFFICIENT_FOR_DISTANT_POINTS;
+            return originalSize * mix(minAvailableSize, minAvailableSize + 15.0, 1.0 - mixCoefficient);
+
           }
-          float KOEF_TO_MULTIPLY_BUFFER_DIFFERENCE = 300.0; // разница буффера от единицы слишком мала поэтому домножаем на 10 в какой-нибудь степени
-          return originalSize + (1.0 - depthBuffer) * KOEF_TO_MULTIPLY_BUFFER_DIFFERENCE;
+
+          float mixCoefficient = (depthBuffer - getMaxThresholdDepthBuffer()) / (0.999999 - getMaxThresholdDepthBuffer());
+          
+          // UPD: ПРИ ИЗМЕНЕНИИ ЗНАЧЕНИЙ В ЭТОЙ СТРОКЕ, ОБРАТИТИТЬ ВНИМАНИЕ НА MAX_SIZE_KOEFFICIENT_FOR_DISTANT_POINTS
+          return originalSize * mix(0.0, 3.0, 1.0 - mixCoefficient);
         }
 
 
@@ -91,12 +109,18 @@ export class PointCloudRenderer {
 
             float linearDepth = (gl_Position.z / gl_Position.w + 1.0) * 0.5;
 
-            if(linearDepth > MAX_DEPTH_BUFFER_VALUE && OFFSET_COEFFICIENT > 1.0){
-              float normalizedDepthBuffer = (linearDepth - MAX_DEPTH_BUFFER_VALUE) / (1.0 - MAX_DEPTH_BUFFER_VALUE);
-              if (gl_VertexID % int(40.0 + normalizedDepthBuffer * pointSize * 2.0 * 40.0) != 0) {
+            float thresholdDepthBuffer = getMaxThresholdDepthBuffer();
+
+            if(linearDepth > thresholdDepthBuffer && OFFSET_COEFFICIENT > 1.0){
+              float normalizedDepthBuffer = (linearDepth - thresholdDepthBuffer) / (1.0 - thresholdDepthBuffer);
+
+              float thinVertexId = 40.0 + thiningFactorK * 10.0;
+
+              if (thiningFactorK > 0.0 && gl_VertexID % int(thinVertexId + normalizedDepthBuffer * pointSize * 2.0 * thinVertexId) != 0) {
                 gl_Position = vec4(0.0, 0.0, -2.0, 1.0);
                 gl_PointSize = 0.0;
                 vPs = gl_PointSize;
+                return;
               }
             }
 

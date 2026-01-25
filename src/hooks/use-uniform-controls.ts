@@ -2,9 +2,9 @@ import { useControls, button } from "leva";
 import type { PointCloudRenderer } from "../pointCloud";
 
 export const defaultLewaParams = {
-  depthBufferThreshold: 0.5,
-  pointSize: 2.0,
-  thiningFactorK: 50,
+  depthBufferThreshold: 0.92,
+  pointSize: 0.6,
+  thiningFactorK: 2,
 };
 
 export const useUniformControls = (pointCloudRenderer: PointCloudRenderer) => {
@@ -13,7 +13,7 @@ export const useUniformControls = (pointCloudRenderer: PointCloudRenderer) => {
       value: defaultLewaParams.depthBufferThreshold,
       min: 0,
       max: 1,
-      step: 0.01,
+      step: 0.0001,
       label: "Глубина буфера",
       onChange: (depthBufferThreshold) => {
         pointCloudRenderer?.getAllPointClouds()?.forEach((cloud) => {
@@ -40,7 +40,7 @@ export const useUniformControls = (pointCloudRenderer: PointCloudRenderer) => {
     k: {
       value: defaultLewaParams.thiningFactorK,
       min: 0,
-      max: 100,
+      max: 5,
       step: 1,
       label: "Коэффициент прореживания",
       onChange: (thiningFactorK) => {
