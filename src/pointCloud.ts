@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { LASChunk } from "./types";
-import { defaultLewaParams } from "./hooks/use-uniform-controls";
+import { defaultGraphicUniformParams } from "./components/use-uniform-controls";
 
 export class PointCloudRenderer {
   private scene: THREE.Scene;
@@ -149,13 +149,13 @@ export class PointCloudRenderer {
         
         `,
         uniforms: {
-          pointSize: { value: defaultLewaParams.pointSize },
+          pointSize: { value: defaultGraphicUniformParams.pointSize },
           totalPointsCount: { value: this.totalPointsCount },
           depthBufferThreshold: {
-            value: defaultLewaParams.depthBufferThreshold,
+            value: defaultGraphicUniformParams.depthBufferThreshold,
           },
           thiningFactorK: {
-            value: defaultLewaParams.thiningFactorK,
+            value: defaultGraphicUniformParams.thiningFactorK,
           },
         },
       });

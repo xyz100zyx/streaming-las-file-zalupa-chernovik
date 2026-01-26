@@ -6,6 +6,7 @@ import "./PointCloudViewer.css";
 import { OrbitControls } from "three/examples/jsm/Addons.js";
 import Stats from "stats.js";
 import { SceneConfigControls } from "./components/SceneConfigControls";
+import { CustomFPSStat } from "./components/CustomFPSStat";
 
 export const PointCloudViewer: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -63,6 +64,7 @@ export const PointCloudViewer: React.FC = () => {
 
     const orbitControls = new OrbitControls(camera, renderer.domElement);
     window.controls = orbitControls;
+    orbitControls.enableDamping = false;
 
     setSceneInit(true);
 
@@ -128,8 +130,6 @@ export const PointCloudViewer: React.FC = () => {
             cameraRef.current.position.clone();
           cameraRef.current.userData.initialLookAt = center.clone();
         }
-
-        pointCloudRef.current?.setPointSize?.(28);
       } catch (error) {
         console.log("loading error", error);
       } finally {
@@ -185,6 +185,7 @@ export const PointCloudViewer: React.FC = () => {
       {isSceneInit && pointCloudRef.current && (
         <SceneConfigControls pointCloudRenderer={pointCloudRef.current} />
       )}
+      <CustomFPSStat />
     </>
   );
 };
