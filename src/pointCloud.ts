@@ -36,12 +36,9 @@ export class PointCloudRenderer {
         colors[i] = chunk.colors[i] / 255;
       }
       geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-      console.log("color", geometry.getAttribute("color"));
-      console.log("position", geometry.getAttribute("position"));
 
       geometry.computeBoundingBox();
       geometry.computeBoundingSphere();
-      console.log("pc", this.totalPointsCount);
 
       const pointShaderMaterial = new THREE.ShaderMaterial({
         vertexShader: `
