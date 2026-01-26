@@ -27,7 +27,7 @@ export const graphicUniformParamsMeta: TGraphicUniformParamsMeta = {
   depthBufferThreshold: {
     min: 0,
     max: 1,
-    step: 0.0001,
+    step: 0.1,
     label: "Глубина буфера",
   },
   pointSize: {

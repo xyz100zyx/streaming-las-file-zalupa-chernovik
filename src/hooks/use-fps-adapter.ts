@@ -19,6 +19,13 @@ class GraphicsOptimizer {
 
   private adaptationSpeed!: number;
 
+  private doneGraphicParameters: Record<keyof TGraphicUniformParams, boolean> =
+    {
+      depthBufferThreshold: false,
+      pointSize: true,
+      thiningFactorK: false,
+    };
+
   private onProgressCallback!:
     | ((params: {
         fps: number;
@@ -46,7 +53,7 @@ class GraphicsOptimizer {
   ) {
     this.targetFPS = targetFPS;
     this.graphicParams = graphicParams;
-    console.log("constructor", graphicParams);
+
     this.graphicParamsMeta = graphicParamsMeta;
 
     this.isRunning = false;
@@ -55,8 +62,6 @@ class GraphicsOptimizer {
     this.frameCount = 0;
     this.fps = 0;
 
-    // Параметры адаптации
-    this.adaptationSpeed = 0.1;
     this.measurementStart = 0;
 
     this.onProgressCallback = null;
@@ -75,11 +80,16 @@ class GraphicsOptimizer {
     this.measurementStart = this.lastTime;
     this.frameCount = 0;
 
-    this.optimize();
+    this.rafId = requestAnimationFrame(this.optimize);
   }
 
   stopOptimization() {
     this.isRunning = false;
+    this.doneGraphicParameters = {
+      depthBufferThreshold: false,
+      pointSize: true,
+      thiningFactorK: false,
+    };
     if (this.rafId) {
       cancelAnimationFrame(this.rafId);
     }
@@ -90,11 +100,10 @@ class GraphicsOptimizer {
 
     const deltaTime = currentTime - this.lastTime;
 
-    // Считаем FPS
     if (deltaTime > 0) {
       this.frameCount++;
 
-      const TIME_TO_UPDATE_FPS = 500;
+      const TIME_TO_UPDATE_FPS = 1_500;
       if (currentTime - this.measurementStart >= TIME_TO_UPDATE_FPS) {
         this.fps = Math.round(
           (this.frameCount * 1000) / (currentTime - this.measurementStart),
@@ -103,9 +112,14 @@ class GraphicsOptimizer {
         this.frameCount = 0;
 
         // подгон depthBuffer
-        this.adaptDepthBuffer();
 
-        // Отправляем прогресс
+        if (!this.doneGraphicParameters.depthBufferThreshold) {
+          this.adaptDepthBuffer();
+        }
+        if (this.doneGraphicParameters.depthBufferThreshold) {
+          this.adaptThiningFactor();
+        }
+
         if (this.onProgressCallback) {
           this.onProgressCallback({
             fps: this.fps,
@@ -115,8 +129,11 @@ class GraphicsOptimizer {
           });
         }
 
-        // Проверяем завершение
-        if (this.isStable()) {
+        if (
+          this.isStable() ||
+          (this.doneGraphicParameters.depthBufferThreshold &&
+            this.doneGraphicParameters.thiningFactorK)
+        ) {
           this.stopOptimization();
           if (this.onCompleteCallback) {
             this.onCompleteCallback(this.graphicParams.depthBufferThreshold);
@@ -143,21 +160,12 @@ class GraphicsOptimizer {
     */
     let depthBufferChange = 0;
 
-    const PARAMETER_SMOOTH_KOEFFICIENT = 0.5; // погрешность 5%
-
     if (fpsDiff < 0) {
       // FPS меньше таргета
-      const ratio = Math.abs(fpsDiff) / this.targetFPS;
-      depthBufferChange =
-        -this.graphicParams.depthBufferThreshold * ratio * this.adaptationSpeed;
+      depthBufferChange = -this.graphicParamsMeta.depthBufferThreshold.step;
     } else {
       // FPS больше таргета
-      const ratio = fpsDiff / this.targetFPS;
-      depthBufferChange =
-        this.graphicParams.depthBufferThreshold *
-        ratio *
-        this.adaptationSpeed *
-        PARAMETER_SMOOTH_KOEFFICIENT;
+      depthBufferChange = this.graphicParamsMeta.depthBufferThreshold.step;
     }
 
     this.graphicParams.depthBufferThreshold = Math.max(
@@ -167,10 +175,30 @@ class GraphicsOptimizer {
         this.graphicParams.depthBufferThreshold + depthBufferChange,
       ),
     );
+
     this.updateParamCallback(
       "depthBufferThreshold",
       this.graphicParams.depthBufferThreshold,
     );
+
+    if (
+      fpsDiff < 0 &&
+      Math.abs(
+        this.graphicParams.depthBufferThreshold -
+          this.graphicParamsMeta.depthBufferThreshold.min,
+      ) < FPS_THRESHOLD
+    ) {
+      this.doneGraphicParameters.depthBufferThreshold = true;
+    }
+    if (
+      fpsDiff >= 0 &&
+      Math.abs(
+        this.graphicParams.depthBufferThreshold -
+          this.graphicParamsMeta.depthBufferThreshold.max,
+      ) < FPS_THRESHOLD
+    ) {
+      this.doneGraphicParameters.depthBufferThreshold = true;
+    }
   }
 
   adaptThiningFactor() {
@@ -182,38 +210,48 @@ class GraphicsOptimizer {
     }
 
     /*
-      FPS больше таргета - увеличиваем буффер и наоборот
+      FPS больше таргета - увеличиваем thiningFactorK и наоборот
     */
-    let depthBufferChange = 0;
-
-    const PARAMETER_SMOOTH_KOEFFICIENT = 0.5; // погрешность 5%
+    let thiningFactorChange = 0;
 
     if (fpsDiff < 0) {
       // FPS меньше таргета
-      const ratio = Math.abs(fpsDiff) / this.targetFPS;
-      depthBufferChange =
-        -this.graphicParams.depthBufferThreshold * ratio * this.adaptationSpeed;
+      thiningFactorChange = this.graphicParamsMeta.thiningFactorK.step;
     } else {
       // FPS больше таргета
-      const ratio = fpsDiff / this.targetFPS;
-      depthBufferChange =
-        this.graphicParams.depthBufferThreshold *
-        ratio *
-        this.adaptationSpeed *
-        PARAMETER_SMOOTH_KOEFFICIENT;
+      thiningFactorChange = -this.graphicParamsMeta.thiningFactorK.step;
     }
 
-    this.graphicParams.depthBufferThreshold = Math.max(
-      this.graphicParamsMeta.depthBufferThreshold.min,
+    this.graphicParams.thiningFactorK = Math.max(
+      this.graphicParamsMeta.thiningFactorK.min,
       Math.min(
-        this.graphicParamsMeta.depthBufferThreshold.max,
-        this.graphicParams.depthBufferThreshold + depthBufferChange,
+        this.graphicParamsMeta.thiningFactorK.max,
+        this.graphicParams.thiningFactorK + thiningFactorChange,
       ),
     );
     this.updateParamCallback(
-      "depthBufferThreshold",
-      this.graphicParams.depthBufferThreshold,
+      "thiningFactorK",
+      this.graphicParams.thiningFactorK,
     );
+
+    if (
+      fpsDiff < 0 &&
+      Math.abs(
+        this.graphicParams.thiningFactorK -
+          this.graphicParamsMeta.thiningFactorK.max,
+      ) < FPS_THRESHOLD
+    ) {
+      this.doneGraphicParameters.thiningFactorK = true;
+    }
+    if (
+      fpsDiff >= 0 &&
+      Math.abs(
+        this.graphicParams.thiningFactorK -
+          this.graphicParamsMeta.thiningFactorK.min,
+      ) < FPS_THRESHOLD
+    ) {
+      this.doneGraphicParameters.thiningFactorK = true;
+    }
   }
 
   calculateProgress() {
@@ -228,7 +266,7 @@ class GraphicsOptimizer {
     const PARAMETER_SMOOTH_KOEFFICIENT = 0.5; // погрешность 5%
 
     const fpsDiff = Math.abs(this.fps - this.targetFPS);
-    return fpsDiff < this.targetFPS * PARAMETER_SMOOTH_KOEFFICIENT; // В пределах 5%
+    return fpsDiff < PARAMETER_SMOOTH_KOEFFICIENT; // В пределах 5%
   }
 }
 

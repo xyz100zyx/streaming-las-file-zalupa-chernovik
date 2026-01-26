@@ -20,11 +20,9 @@ export const FPSAdapter: FC<{
     setSelectedFPS(fps);
 
     startOptimization(fps, (optimizedK) => {
-      ((k) => {
-        console.log({ k });
-        alert("done");
-      },
-        setSelectedFPS(null));
+      console.log({ optimizedK });
+      alert("done");
+      setSelectedFPS(null);
     });
   };
 
@@ -74,8 +72,7 @@ export const FPSAdapter: FC<{
                 </div>
                 <div className="progress-info">
                   <span>Текущий FPS: {progress.fps}</span>
-                  <span>Целевой FPS: {progress.targetFPS}</span>
-                  <span>Качество (k): {progress.k.toFixed(2)}</span>
+                  <span>Ожидаемый FPS: {progress.targetFPS}</span>
                 </div>
               </div>
             )}

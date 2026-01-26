@@ -18,7 +18,6 @@ export const CustomFPSStat: FC = () => {
         if (spanFPSContentRef.current) {
           spanFPSContentRef.current.textContent = String(fps);
         }
-        console.log(`FPS: ${fps}`);
       }
 
       requestAnimationFrame(updateFPS);
